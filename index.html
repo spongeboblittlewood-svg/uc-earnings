@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UC Earnings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2b2b2b">
+
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,Arial;margin:0;padding:15px;background:#f4f4f4}
+h1,h2,h3{margin-top:0}
+.card{background:#fff;padding:12px;margin-bottom:15px;border-radius:8px}
+input,button{width:100%;padding:10px;margin-top:6px;font-size:16px}
+button{font-weight:bold}
+.total{font-size:18px;font-weight:bold}
+</style>
+</head>
+
+<body>
+<h1>UC Earnings</h1>
+<h2 id="period"></h2>
+
+<div class="card">
+<h3>Add Income</h3>
+<input type="date" id="iDate">
+<input type="text" id="iDesc" placeholder="Description">
+<input type="number" id="iAmt" placeholder="£">
+<button onclick="addIncome()">Add Income</button>
+</div>
+
+<div class="card">
+<h3>Add Expense</h3>
+<input type="date" id="eDate">
+<input type="text" id="eDesc" placeholder="Description">
+<input type="number" id="eAmt" placeholder="£">
+<button onclick="addExpense()">Add Expense</button>
+</div>
+
+<div class="card">
+<h3>Recurring Monthly Expenses</h3>
+<input type="text" id="rDesc" placeholder="Description">
+<input type="number" id="rAmt" placeholder="£">
+<button onclick="addRecurring()">Add Recurring</button>
+<div id="rList"></div>
+</div>
+
+<div class="card">
+<h3>Totals</h3>
+<div id="totals" class="total"></div>
+</div>
+
+<button onclick="nextPeriod()">Save Period & Start Next</button>
+<button onclick="exportPDF()">Export PDF</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+let data=JSON.parse(localStorage.getItem("ucPWA"))||{
+ start:getStart(new Date()),income:[],expenses:[],recurring:[]
+};
+
+function getStart(d){let x=new Date(d);if(x.getDate()<28)x.setMonth(x.getMonth()-1);x.setDate(28);return x}
+function getEnd(s){let e=new Date(s);e.setMonth(e.getMonth()+1);e.setDate(27);return e}
+function f(d){return d.toISOString().split("T")[0]}
+
+function update(){
+ let s=new Date(data.start),e=getEnd(s);
+ period.innerText=`Assessment Period: ${s.toDateString()} – ${e.toDateString()}`;
+ let it=data.income.reduce((a,b)=>a+b.amount,0);
+ let et=data.expenses.reduce((a,b)=>a+b.amount,0);
+ totals.innerText=`Income £${it.toFixed(2)} | Expenses £${et.toFixed(2)} | Net £${(it-et).toFixed(2)}`;
+ rList.innerHTML="";
+ data.recurring.forEach(x=>{let d=document.createElement("div");d.innerText=`${x.desc} £${x.amount}`;rList.appendChild(d)});
+ localStorage.setItem("ucPWA",JSON.stringify(data));
+}
+
+function addIncome(){data.income.push({date:iDate.value||f(new Date()),desc:iDesc.value,amount:+iAmt.value});update()}
+function addExpense(){data.expenses.push({date:eDate.value||f(new Date()),desc:eDesc.value,amount:+eAmt.value});update()}
+function addRecurring(){data.recurring.push({desc:rDesc.value,amount:+rAmt.value});update()}
+
+function nextPeriod(){
+ let n=new Date(data.start);n.setMonth(n.getMonth()+1);
+ data.start=n;data.income=[];
+ data.expenses=data.recurring.map(r=>({date:f(n),desc:r.desc,amount:r.amount}));
+ update();
+}
+
+function exportPDF(){
+ const{jsPDF}=window.jspdf;let p=new jsPDF();
+ p.text("Universal Credit Earnings Report",10,10);
+ p.text(period.innerText,10,20);let y=30;
+ p.text("Income",10,y);
+ data.income.forEach(i=>{y+=8;p.text(`${i.date} ${i.desc} £${i.amount}`,10,y)});
+ y+=10;p.text("Expenses",10,y);
+ data.expenses.forEach(e=>{y+=8;p.text(`${e.date} ${e.desc} £${e.amount}`,10,y)});
+ p.save("UC_Earnings_Report.pdf");
+}
+
+if("serviceWorker"in navigator){navigator.serviceWorker.register("service-worker.js")}
+update();
+</script>
+</body>
+</html>
