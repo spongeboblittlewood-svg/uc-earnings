@@ -11,7 +11,7 @@
 body{font-family:-apple-system,BlinkMacSystemFont,Arial;margin:0;padding:15px;background:#f4f4f4}
 h1,h2,h3{margin-top:0}
 .card{background:#fff;padding:12px;margin-bottom:15px;border-radius:8px}
-input,button,select{width:100%;padding:10px;margin-top:6px;font-size:16px}
+input,button{width:100%;padding:10px;margin-top:6px;font-size:16px}
 button{font-weight:bold}
 .total{font-size:18px;font-weight:bold}
 .item{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding:6px 0}
@@ -19,7 +19,6 @@ button{font-weight:bold}
 .btn{margin-left:5px}
 .del{background:#d9534f;color:#fff;border:none;padding:6px 10px;border-radius:4px}
 .edit{background:#0275d8;color:#fff;border:none;padding:6px 10px;border-radius:4px}
-.locked{opacity:0.6}
 .small{font-size:14px;color:#555}
 </style>
 </head>
@@ -74,7 +73,6 @@ function newMonth(d){
  let s=new Date(d);if(s.getDate()<28)s.setMonth(s.getMonth()-1);s.setDate(28);
  return {start:s,income:[],expenses:[],locked:false};
 }
-
 function endOf(s){let e=new Date(s);e.setMonth(e.getMonth()+1);e.setDate(27);return e}
 function f(d){return d.toISOString().split("T")[0]}
 
@@ -92,11 +90,18 @@ function update(){
 
  incomeList.innerHTML="";
  m.income.forEach((i,n)=>row(incomeList,`${i.date} – ${i.desc} – £${i.amount}`,()=>editIncome(n),()=>delIncome(n)));
+
  expenseList.innerHTML="";
  m.expenses.forEach((x,n)=>row(expenseList,`${x.date} – ${x.desc} – £${x.amount}`,()=>editExpense(n),()=>delExpense(n)));
 
  rList.innerHTML="";
- store.recurring.forEach(r=>{let d=document.createElement("div");d.innerText=`${r.desc} – £${r.amount}`;rList.appendChild(d)});
+ store.recurring.forEach((r,n)=>{
+  let d=document.createElement("div");d.className="item";
+  d.innerHTML=`<span>${r.desc} – £${r.amount}</span>`;
+  let x=document.createElement("button");x.className="del btn";x.innerText="Del";
+  x.onclick=()=>confirm("Delete recurring expense?")&&delRecurring(n);
+  d.appendChild(x);rList.appendChild(d);
+ });
 
  localStorage.setItem("ucPWA2",JSON.stringify(store));
 }
@@ -113,14 +118,16 @@ function saveIncome(){
  let m=store.current,i=iEdit.value;
  let obj={date:iDate.value||f(new Date()),desc:iDesc.value,amount:+iAmt.value};
  i!==""?m.income[i]=obj:m.income.push(obj);
- iEdit.value="";update();
+ iEdit.value="";iDate.value="";iDesc.value="";iAmt.value="";
+ update();
 }
 
 function saveExpense(){
  let m=store.current,i=eEdit.value;
  let obj={date:eDate.value||f(new Date()),desc:eDesc.value,amount:+eAmt.value};
  i!==""?m.expenses[i]=obj:m.expenses.push(obj);
- eEdit.value="";update();
+ eEdit.value="";eDate.value="";eDesc.value="";eAmt.value="";
+ update();
 }
 
 function editIncome(i){let x=store.current.income[i];iEdit.value=i;iDate.value=x.date;iDesc.value=x.desc;iAmt.value=x.amount}
@@ -129,7 +136,16 @@ function editExpense(i){let x=store.current.expenses[i];eEdit.value=i;eDate.valu
 function delIncome(i){store.current.income.splice(i,1);update()}
 function delExpense(i){store.current.expenses.splice(i,1);update()}
 
-function addRecurring(){store.recurring.push({desc:rDesc.value,amount:+rAmt.value});update()}
+function addRecurring(){
+ store.recurring.push({desc:rDesc.value,amount:+rAmt.value});
+ rDesc.value="";rAmt.value="";
+ update();
+}
+
+function delRecurring(i){
+ store.recurring.splice(i,1);
+ update();
+}
 
 function saveMonth(){
  store.current.locked=true;
@@ -151,7 +167,7 @@ function exportPDF(){
  p.save("UC_Earnings_Report.pdf");
 }
 
-if("serviceWorker"in navigator){navigator.serviceWorker.register("service-worker.js")}
+if("serviceWorker"in navigator"){navigator.serviceWorker.register("service-worker.js")}
 update();
 </script>
 </body>
