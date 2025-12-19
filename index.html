@@ -19,7 +19,6 @@ button{font-weight:bold}
 .btn{margin-left:5px}
 .del{background:#d9534f;color:#fff;border:none;padding:6px 10px;border-radius:4px}
 .edit{background:#0275d8;color:#fff;border:none;padding:6px 10px;border-radius:4px}
-.locked{opacity:0.6}
 .small{font-size:14px;color:#555}
 </style>
 </head>
@@ -66,6 +65,9 @@ button{font-weight:bold}
 
 <button onclick="saveMonth()">Save Period & Start Next</button>
 <button onclick="exportPDF()">Export PDF</button>
+<button onclick="backupData()">Backup Data</button>
+<button onclick="restoreData()">Restore Backup</button>
+<input type="file" id="restoreFile" style="display:none" accept=".json">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
@@ -185,18 +187,12 @@ function saveExpense(){
 
 function editIncome(i){
  let x=store.current.income[i];
- iEdit.value=i;
- iDate.value=x.date;
- iDesc.value=x.desc;
- iAmt.value=x.amount;
+ iEdit.value=i;iDate.value=x.date;iDesc.value=x.desc;iAmt.value=x.amount;
 }
 
 function editExpense(i){
  let x=store.current.expenses[i];
- eEdit.value=i;
- eDate.value=x.date;
- eDesc.value=x.desc;
- eAmt.value=x.amount;
+ eEdit.value=i;eDate.value=x.date;eDesc.value=x.desc;eAmt.value=x.amount;
 }
 
 function delIncome(i){store.current.income.splice(i,1);update()}
@@ -212,9 +208,7 @@ function saveRecurring(){
 
 function editRecurring(i){
  let r=store.recurring[i];
- rEdit.value=i;
- rDesc.value=r.desc;
- rAmt.value=r.amount;
+ rEdit.value=i;rDesc.value=r.desc;rAmt.value=r.amount;
 }
 
 function delRecurring(i){
@@ -229,9 +223,7 @@ function saveMonth(){
  n.setMonth(n.getMonth()+1);
  store.current=newMonth(n);
  store.current.expenses=store.recurring.map(r=>({
-  date:f(n),
-  desc:r.desc,
-  amount:r.amount
+  date:f(n),desc:r.desc,amount:r.amount
  }));
  update();
 }
@@ -243,20 +235,47 @@ function exportPDF(){
  p.text(period.innerText,10,20);
  let y=30;
  p.text("Income",10,y);
- store.current.income.forEach(i=>{
-  y+=8;
-  p.text(`${i.date} ${i.desc} £${i.amount}`,10,y);
- });
- y+=10;
- p.text("Expenses",10,y);
- store.current.expenses.forEach(e=>{
-  y+=8;
-  p.text(`${e.date} ${e.desc} £${e.amount}`,10,y);
- });
+ store.current.income.forEach(i=>{y+=8;p.text(`${i.date} ${i.desc} £${i.amount}`,10,y)});
+ y+=10;p.text("Expenses",10,y);
+ store.current.expenses.forEach(e=>{y+=8;p.text(`${e.date} ${e.desc} £${e.amount}`,10,y)});
  p.save("UC_Earnings_Report.pdf");
 }
 
-if("serviceWorker" in navigator){
+/* ===== BACKUP / RESTORE ===== */
+
+function backupData(){
+ const data=JSON.stringify(store,null,2);
+ const blob=new Blob([data],{type:"application/json"});
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download=`UC_Backup_${new Date().toISOString().slice(0,10)}.json`;
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+
+function restoreData(){
+ if(!confirm("This will replace ALL current data. Continue?"))return;
+ document.getElementById("restoreFile").click();
+}
+
+document.getElementById("restoreFile").addEventListener("change",e=>{
+ const file=e.target.files[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=ev=>{
+  try{
+   store=JSON.parse(ev.target.result);
+   localStorage.setItem("ucPWA2",JSON.stringify(store));
+   update();
+   alert("Backup restored successfully.");
+  }catch{
+   alert("Invalid backup file.");
+  }
+ };
+ reader.readAsText(file);
+});
+
+if("serviceWorker"in navigator){
  navigator.serviceWorker.register("service-worker.js");
 }
 
