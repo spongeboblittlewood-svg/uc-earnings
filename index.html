@@ -51,9 +51,10 @@ button{font-weight:bold}
 
 <div class="card">
 <h3>Recurring Monthly Expenses</h3>
+<input type="hidden" id="rEdit">
 <input type="text" id="rDesc" placeholder="Description">
 <input type="number" id="rAmt" placeholder="£">
-<button onclick="addRecurring()">Add Recurring</button>
+<button onclick="saveRecurring()">Save Recurring</button>
 <div id="rList" class="small"></div>
 </div>
 
@@ -68,18 +69,31 @@ button{font-weight:bold}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-let store=JSON.parse(localStorage.getItem("ucPWA2"))||{months:[],current:newMonth(new Date()),recurring:[]};
+let store=JSON.parse(localStorage.getItem("ucPWA2"))||{
+ months:[],
+ current:newMonth(new Date()),
+ recurring:[]
+};
 
 function newMonth(d){
- let s=new Date(d);if(s.getDate()<28)s.setMonth(s.getMonth()-1);s.setDate(28);
+ let s=new Date(d);
+ if(s.getDate()<28)s.setMonth(s.getMonth()-1);
+ s.setDate(28);
  return {start:s,income:[],expenses:[],locked:false};
 }
 
-function endOf(s){let e=new Date(s);e.setMonth(e.getMonth()+1);e.setDate(27);return e}
+function endOf(s){
+ let e=new Date(s);
+ e.setMonth(e.getMonth()+1);
+ e.setDate(27);
+ return e;
+}
+
 function f(d){return d.toISOString().split("T")[0]}
 
 function update(){
- let m=store.current,s=new Date(m.start),e=endOf(s);
+ let m=store.current;
+ let s=new Date(m.start),e=endOf(s);
  period.innerText=`Assessment Period: ${s.toDateString()} – ${e.toDateString()}`;
 
  let it=m.income.reduce((a,b)=>a+b.amount,0);
@@ -87,72 +101,167 @@ function update(){
  totals.innerText=`Income £${it.toFixed(2)} | Expenses £${et.toFixed(2)} | Net £${(it-et).toFixed(2)}`;
 
  let yI=0,yE=0;
- store.months.forEach(x=>{yI+=x.income.reduce((a,b)=>a+b.amount,0);yE+=x.expenses.reduce((a,b)=>a+b.amount,0)});
+ store.months.forEach(x=>{
+  yI+=x.income.reduce((a,b)=>a+b.amount,0);
+  yE+=x.expenses.reduce((a,b)=>a+b.amount,0);
+ });
  yearTotals.innerText=`Year to date — Income £${yI.toFixed(2)}, Expenses £${yE.toFixed(2)}, Net £${(yI-yE).toFixed(2)}`;
 
  incomeList.innerHTML="";
- m.income.forEach((i,n)=>row(incomeList,`${i.date} – ${i.desc} – £${i.amount}`,()=>editIncome(n),()=>delIncome(n)));
+ m.income.forEach((i,n)=>row(
+  incomeList,
+  `${i.date} – ${i.desc} – £${i.amount}`,
+  ()=>editIncome(n),
+  ()=>delIncome(n)
+ ));
+
  expenseList.innerHTML="";
- m.expenses.forEach((x,n)=>row(expenseList,`${x.date} – ${x.desc} – £${x.amount}`,()=>editExpense(n),()=>delExpense(n)));
+ m.expenses.forEach((x,n)=>row(
+  expenseList,
+  `${x.date} – ${x.desc} – £${x.amount}`,
+  ()=>editExpense(n),
+  ()=>delExpense(n)
+ ));
 
  rList.innerHTML="";
- store.recurring.forEach(r=>{let d=document.createElement("div");d.innerText=`${r.desc} – £${r.amount}`;rList.appendChild(d)});
+ store.recurring.forEach((r,n)=>{
+  let d=document.createElement("div");
+  d.className="item";
+  d.innerHTML=`<span>${r.desc} – £${r.amount}</span>`;
+
+  let e=document.createElement("button");
+  e.className="edit btn";
+  e.innerText="Edit";
+  e.onclick=()=>editRecurring(n);
+
+  let x=document.createElement("button");
+  x.className="del btn";
+  x.innerText="Del";
+  x.onclick=()=>confirm("Delete recurring expense?") && delRecurring(n);
+
+  d.appendChild(e);
+  d.appendChild(x);
+  rList.appendChild(d);
+ });
 
  localStorage.setItem("ucPWA2",JSON.stringify(store));
 }
 
 function row(parent,text,editFn,delFn){
- let d=document.createElement("div");d.className="item";
+ let d=document.createElement("div");
+ d.className="item";
  d.innerHTML=`<span>${text}</span>`;
- let e=document.createElement("button");e.className="edit btn";e.innerText="Edit";e.onclick=editFn;
- let x=document.createElement("button");x.className="del btn";x.innerText="Del";x.onclick=()=>confirm("Delete entry?")&&delFn();
- d.appendChild(e);d.appendChild(x);parent.appendChild(d);
+
+ let e=document.createElement("button");
+ e.className="edit btn";
+ e.innerText="Edit";
+ e.onclick=editFn;
+
+ let x=document.createElement("button");
+ x.className="del btn";
+ x.innerText="Del";
+ x.onclick=()=>confirm("Delete entry?") && delFn();
+
+ d.appendChild(e);
+ d.appendChild(x);
+ parent.appendChild(d);
 }
 
 function saveIncome(){
  let m=store.current,i=iEdit.value;
- let obj={date:iDate.value||f(new Date()),desc:iDesc.value,amount:+iAmt.value};
- i!==""?m.income[i]=obj:m.income.push(obj);
- iEdit.value="";update();
+ let o={date:iDate.value||f(new Date()),desc:iDesc.value,amount:+iAmt.value};
+ i!=="" ? m.income[i]=o : m.income.push(o);
+ iEdit.value="";
+ update();
 }
 
 function saveExpense(){
  let m=store.current,i=eEdit.value;
- let obj={date:eDate.value||f(new Date()),desc:eDesc.value,amount:+eAmt.value};
- i!==""?m.expenses[i]=obj:m.expenses.push(obj);
- eEdit.value="";update();
+ let o={date:eDate.value||f(new Date()),desc:eDesc.value,amount:+eAmt.value};
+ i!=="" ? m.expenses[i]=o : m.expenses.push(o);
+ eEdit.value="";
+ update();
 }
 
-function editIncome(i){let x=store.current.income[i];iEdit.value=i;iDate.value=x.date;iDesc.value=x.desc;iAmt.value=x.amount}
-function editExpense(i){let x=store.current.expenses[i];eEdit.value=i;eDate.value=x.date;eDesc.value=x.desc;eAmt.value=x.amount}
+function editIncome(i){
+ let x=store.current.income[i];
+ iEdit.value=i;
+ iDate.value=x.date;
+ iDesc.value=x.desc;
+ iAmt.value=x.amount;
+}
+
+function editExpense(i){
+ let x=store.current.expenses[i];
+ eEdit.value=i;
+ eDate.value=x.date;
+ eDesc.value=x.desc;
+ eAmt.value=x.amount;
+}
 
 function delIncome(i){store.current.income.splice(i,1);update()}
 function delExpense(i){store.current.expenses.splice(i,1);update()}
 
-function addRecurring(){store.recurring.push({desc:rDesc.value,amount:+rAmt.value});update()}
+function saveRecurring(){
+ let i=rEdit.value;
+ let o={desc:rDesc.value,amount:+rAmt.value};
+ i!=="" ? store.recurring[i]=o : store.recurring.push(o);
+ rEdit.value="";
+ update();
+}
+
+function editRecurring(i){
+ let r=store.recurring[i];
+ rEdit.value=i;
+ rDesc.value=r.desc;
+ rAmt.value=r.amount;
+}
+
+function delRecurring(i){
+ store.recurring.splice(i,1);
+ update();
+}
 
 function saveMonth(){
  store.current.locked=true;
  store.months.push(store.current);
- let n=new Date(store.current.start);n.setMonth(n.getMonth()+1);
+ let n=new Date(store.current.start);
+ n.setMonth(n.getMonth()+1);
  store.current=newMonth(n);
- store.current.expenses=store.recurring.map(r=>({date:f(n),desc:r.desc,amount:r.amount}));
+ store.current.expenses=store.recurring.map(r=>({
+  date:f(n),
+  desc:r.desc,
+  amount:r.amount
+ }));
  update();
 }
 
 function exportPDF(){
- const{jsPDF}=window.jspdf;let p=new jsPDF();
+ const{jsPDF}=window.jspdf;
+ let p=new jsPDF();
  p.text("Universal Credit Earnings Report",10,10);
- p.text(period.innerText,10,20);let y=30;
+ p.text(period.innerText,10,20);
+ let y=30;
  p.text("Income",10,y);
- store.current.income.forEach(i=>{y+=8;p.text(`${i.date} ${i.desc} £${i.amount}`,10,y)});
- y+=10;p.text("Expenses",10,y);
- store.current.expenses.forEach(e=>{y+=8;p.text(`${e.date} ${e.desc} £${e.amount}`,10,y)});
+ store.current.income.forEach(i=>{
+  y+=8;
+  p.text(`${i.date} ${i.desc} £${i.amount}`,10,y);
+ });
+ y+=10;
+ p.text("Expenses",10,y);
+ store.current.expenses.forEach(e=>{
+  y+=8;
+  p.text(`${e.date} ${e.desc} £${e.amount}`,10,y);
+ });
  p.save("UC_Earnings_Report.pdf");
 }
 
-if("serviceWorker"in navigator){navigator.serviceWorker.register("service-worker.js")}
+if("serviceWorker" in navigator){
+ navigator.serviceWorker.register("service-worker.js");
+}
+
 update();
 </script>
+
 </body>
 </html>
