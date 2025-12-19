@@ -50,16 +50,16 @@ button{font-weight:bold}
 
 <div class="card">
 <h3>Recurring Monthly Expenses</h3>
+<input type="hidden" id="rEdit">
 <input type="text" id="rDesc" placeholder="Description">
 <input type="number" id="rAmt" placeholder="£">
-<button onclick="addRecurring()">Add Recurring</button>
+<button onclick="saveRecurring()">Save Recurring</button>
 <div id="rList" class="small"></div>
 </div>
 
 <div class="card">
 <h3>Totals</h3>
 <div id="totals" class="total"></div>
-<div id="yearTotals" class="small"></div>
 </div>
 
 <button onclick="saveMonth()">Save Period & Start Next</button>
@@ -67,26 +67,36 @@ button{font-weight:bold}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-let store=JSON.parse(localStorage.getItem("ucPWA2"))||{months:[],current:newMonth(new Date()),recurring:[]};
+let store=JSON.parse(localStorage.getItem("ucPWA2"))||{
+ months:[],
+ current:newMonth(new Date()),
+ recurring:[]
+};
 
 function newMonth(d){
- let s=new Date(d);if(s.getDate()<28)s.setMonth(s.getMonth()-1);s.setDate(28);
- return {start:s,income:[],expenses:[],locked:false};
+ let s=new Date(d);
+ if(s.getDate()<28)s.setMonth(s.getMonth()-1);
+ s.setDate(28);
+ return {start:s,income:[],expenses:[]};
 }
-function endOf(s){let e=new Date(s);e.setMonth(e.getMonth()+1);e.setDate(27);return e}
+
+function endOf(s){
+ let e=new Date(s);
+ e.setMonth(e.getMonth()+1);
+ e.setDate(27);
+ return e;
+}
+
 function f(d){return d.toISOString().split("T")[0]}
 
 function update(){
- let m=store.current,s=new Date(m.start),e=endOf(s);
+ let m=store.current;
+ let s=new Date(m.start),e=endOf(s);
  period.innerText=`Assessment Period: ${s.toDateString()} – ${e.toDateString()}`;
 
  let it=m.income.reduce((a,b)=>a+b.amount,0);
  let et=m.expenses.reduce((a,b)=>a+b.amount,0);
  totals.innerText=`Income £${it.toFixed(2)} | Expenses £${et.toFixed(2)} | Net £${(it-et).toFixed(2)}`;
-
- let yI=0,yE=0;
- store.months.forEach(x=>{yI+=x.income.reduce((a,b)=>a+b.amount,0);yE+=x.expenses.reduce((a,b)=>a+b.amount,0)});
- yearTotals.innerText=`Year to date — Income £${yI.toFixed(2)}, Expenses £${yE.toFixed(2)}, Net £${(yI-yE).toFixed(2)}`;
 
  incomeList.innerHTML="";
  m.income.forEach((i,n)=>row(incomeList,`${i.date} – ${i.desc} – £${i.amount}`,()=>editIncome(n),()=>delIncome(n)));
@@ -96,37 +106,55 @@ function update(){
 
  rList.innerHTML="";
  store.recurring.forEach((r,n)=>{
-  let d=document.createElement("div");d.className="item";
+  let d=document.createElement("div");
+  d.className="item";
   d.innerHTML=`<span>${r.desc} – £${r.amount}</span>`;
-  let x=document.createElement("button");x.className="del btn";x.innerText="Del";
+  let e=document.createElement("button");
+  e.className="edit btn";
+  e.innerText="Edit";
+  e.onclick=()=>editRecurring(n);
+  let x=document.createElement("button");
+  x.className="del btn";
+  x.innerText="Del";
   x.onclick=()=>confirm("Delete recurring expense?")&&delRecurring(n);
-  d.appendChild(x);rList.appendChild(d);
+  d.appendChild(e);
+  d.appendChild(x);
+  rList.appendChild(d);
  });
 
  localStorage.setItem("ucPWA2",JSON.stringify(store));
 }
 
 function row(parent,text,editFn,delFn){
- let d=document.createElement("div");d.className="item";
+ let d=document.createElement("div");
+ d.className="item";
  d.innerHTML=`<span>${text}</span>`;
- let e=document.createElement("button");e.className="edit btn";e.innerText="Edit";e.onclick=editFn;
- let x=document.createElement("button");x.className="del btn";x.innerText="Del";x.onclick=()=>confirm("Delete entry?")&&delFn();
- d.appendChild(e);d.appendChild(x);parent.appendChild(d);
+ let e=document.createElement("button");
+ e.className="edit btn";
+ e.innerText="Edit";
+ e.onclick=editFn;
+ let x=document.createElement("button");
+ x.className="del btn";
+ x.innerText="Del";
+ x.onclick=()=>confirm("Delete entry?")&&delFn();
+ d.appendChild(e);
+ d.appendChild(x);
+ parent.appendChild(d);
 }
 
 function saveIncome(){
  let m=store.current,i=iEdit.value;
- let obj={date:iDate.value||f(new Date()),desc:iDesc.value,amount:+iAmt.value};
- i!==""?m.income[i]=obj:m.income.push(obj);
- iEdit.value="";iDate.value="";iDesc.value="";iAmt.value="";
+ let o={date:iDate.value||f(new Date()),desc:iDesc.value,amount:+iAmt.value};
+ i!==""?m.income[i]=o:m.income.push(o);
+ iEdit.value="";
  update();
 }
 
 function saveExpense(){
  let m=store.current,i=eEdit.value;
- let obj={date:eDate.value||f(new Date()),desc:eDesc.value,amount:+eAmt.value};
- i!==""?m.expenses[i]=obj:m.expenses.push(obj);
- eEdit.value="";eDate.value="";eDesc.value="";eAmt.value="";
+ let o={date:eDate.value||f(new Date()),desc:eDesc.value,amount:+eAmt.value};
+ i!==""?m.expenses[i]=o:m.expenses.push(o);
+ eEdit.value="";
  update();
 }
 
@@ -136,10 +164,19 @@ function editExpense(i){let x=store.current.expenses[i];eEdit.value=i;eDate.valu
 function delIncome(i){store.current.income.splice(i,1);update()}
 function delExpense(i){store.current.expenses.splice(i,1);update()}
 
-function addRecurring(){
- store.recurring.push({desc:rDesc.value,amount:+rAmt.value});
- rDesc.value="";rAmt.value="";
+function saveRecurring(){
+ let i=rEdit.value;
+ let o={desc:rDesc.value,amount:+rAmt.value};
+ i!==""?store.recurring[i]=o:store.recurring.push(o);
+ rEdit.value="";
  update();
+}
+
+function editRecurring(i){
+ let r=store.recurring[i];
+ rEdit.value=i;
+ rDesc.value=r.desc;
+ rAmt.value=r.amount;
 }
 
 function delRecurring(i){
@@ -148,27 +185,33 @@ function delRecurring(i){
 }
 
 function saveMonth(){
- store.current.locked=true;
  store.months.push(store.current);
- let n=new Date(store.current.start);n.setMonth(n.getMonth()+1);
+ let n=new Date(store.current.start);
+ n.setMonth(n.getMonth()+1);
  store.current=newMonth(n);
  store.current.expenses=store.recurring.map(r=>({date:f(n),desc:r.desc,amount:r.amount}));
  update();
 }
 
 function exportPDF(){
- const{jsPDF}=window.jspdf;let p=new jsPDF();
+ const{jsPDF}=window.jspdf;
+ let p=new jsPDF();
  p.text("Universal Credit Earnings Report",10,10);
- p.text(period.innerText,10,20);let y=30;
+ p.text(period.innerText,10,20);
+ let y=30;
  p.text("Income",10,y);
  store.current.income.forEach(i=>{y+=8;p.text(`${i.date} ${i.desc} £${i.amount}`,10,y)});
- y+=10;p.text("Expenses",10,y);
+ y+=10;
+ p.text("Expenses",10,y);
  store.current.expenses.forEach(e=>{y+=8;p.text(`${e.date} ${e.desc} £${e.amount}`,10,y)});
  p.save("UC_Earnings_Report.pdf");
 }
 
-if("serviceWorker"in navigator"){navigator.serviceWorker.register("service-worker.js")}
+if("serviceWorker"in navigator"){
+ navigator.serviceWorker.register("service-worker.js");
+}
 update();
 </script>
+
 </body>
 </html>
